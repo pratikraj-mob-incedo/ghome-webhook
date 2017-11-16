@@ -24,6 +24,7 @@ exports.gHomeWebhook = functions.https.onRequest((request, response) => {
 
 	actionMap.set("welcome", actions.welcome);
 	actionMap.set("getNew", actions.getNew);
+	actionMap.set("getPopular", actions.getPopular);
 
 	var user = app.getUser();
 

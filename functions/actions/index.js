@@ -76,3 +76,43 @@ exports.getNew = function(app){
 		}
 	});
 }
+
+exports.getPopular = function(app){
+	contentAction.getPageContent(config.site.categoriesPageId)
+	.then(function(response){
+		var contentList = [],
+			speechText = '',
+			responseText = config.site.actionStack.getPopular.responseText,
+			categoryName = config.site.actionStack.getPopular.categoryMap;
+		if(response.categoryMap[categoryName] !== undefined){
+			var filteredContent = _.find(response.modules, function(obj){
+				if(obj.contentType && obj.contentType.toLowerCase() === 'video' && obj.title.toLowerCase() === categoryName.toLowerCase()){
+					return true;
+				}
+				return false;
+			});
+			if(filteredContent && filteredContent.contentData){
+				contentList = filteredContent.contentData;
+			}
+		}
+		if(contentList.length > 0){
+			for(var i = 0; i < contentList.length; i++){
+				speechText += contentList[i].gist.title;
+				speechText += (parseInt(i + 1) === parseInt(contentList.length)) ? '.' : ', ';
+			}
+			speechText = responseText ? responseText + ' ' + speechText : config.defaultText.getPopular.hasList + ' ' + speechText;
+		}else{
+			speechText = config.defaultText.getPopular.noContent;
+		}
+		console.log("speechText");
+		console.log(speechText);
+		platform.googleHome.sendSpeachResponse(app, speechText);
+	})
+	.catch(function(error){
+		if(error && error.speechText){
+			module.exports.sendError(app, error.speechText);
+		}else{
+			module.exports.sendError(app);
+		}
+	});
+}
