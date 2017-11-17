@@ -14,7 +14,7 @@ exports.sendError = function(app, speechText){
 	if(!speechText){
 		speechText = "Sorry! There was a glitch. Please try again after some time.";
 	}
-	platform.googleHome.sendSpeachResponse(app, speechText);
+	platform.googleHome.sendSpeechResponse(app, speechText);
 }
 
 exports.getSiteData = function(internalName){
@@ -34,7 +34,7 @@ exports.welcome = function(app){
 	if(userAction.userInfo){
 		var firstName = userAction.userInfo.firstName;
 		var speechText = "Hi " + firstName;
-		platform.googleHome.sendSpeachResponse(app, speechText);
+		platform.googleHome.sendSpeechResponse(app, speechText);
 	}else{
 		module.exports.sendError(app, "Sorry! We are unable to authenticate you. Make sure you have link your "+config.site.companyName+" account with google home.");
 	}
@@ -62,11 +62,11 @@ exports.getNew = function(app){
 				speechText += contentList[i].gist.title;
 				speechText += (parseInt(i + 1) === parseInt(contentList.length)) ? '.' : ', ';
 			}
-			speechText = responseText ? responseText + ' ' + speechText : config.defaultText.getNew.hasList + ' ' + speechText;
+			speechText = responseText ? responseText + ' ' + speechText : config.defaultText.getNew.hasContent + ' ' + speechText;
 		}else{
 			speechText = config.defaultText.getNew.noContent;
 		}
-		platform.googleHome.sendSpeachResponse(app, speechText);
+		platform.googleHome.sendSpeechResponse(app, speechText);
 	})
 	.catch(function(error){
 		if(error && error.speechText){
@@ -84,29 +84,23 @@ exports.getPopular = function(app){
 			speechText = '',
 			responseText = config.site.actionStack.getPopular.responseText,
 			categoryName = config.site.actionStack.getPopular.categoryMap;
-		if(response.categoryMap[categoryName] !== undefined){
-			var filteredContent = _.find(response.modules, function(obj){
-				if(obj.contentType && obj.contentType.toLowerCase() === 'video' && obj.title.toLowerCase() === categoryName.toLowerCase()){
-					return true;
-				}
-				return false;
-			});
-			if(filteredContent && filteredContent.contentData){
-				contentList = filteredContent.contentData;
-			}
+
+		var filteredContent = _.find(response.modules, function(obj){
+			return (obj.contentType && obj.contentType.toLowerCase() === 'video' && obj.title.toLowerCase() === categoryName.toLowerCase());
+		});
+		if(filteredContent && filteredContent.contentData){
+			contentList = filteredContent.contentData;
 		}
 		if(contentList.length > 0){
 			for(var i = 0; i < contentList.length; i++){
 				speechText += contentList[i].gist.title;
 				speechText += (parseInt(i + 1) === parseInt(contentList.length)) ? '.' : ', ';
 			}
-			speechText = responseText ? responseText + ' ' + speechText : config.defaultText.getPopular.hasList + ' ' + speechText;
+			speechText = responseText ? responseText + ' ' + speechText : config.defaultText.getPopular.hasContent + ' ' + speechText;
 		}else{
 			speechText = config.defaultText.getPopular.noContent;
 		}
-		console.log("speechText");
-		console.log(speechText);
-		platform.googleHome.sendSpeachResponse(app, speechText);
+		platform.googleHome.sendSpeechResponse(app, speechText);
 	})
 	.catch(function(error){
 		if(error && error.speechText){
@@ -115,4 +109,34 @@ exports.getPopular = function(app){
 			module.exports.sendError(app);
 		}
 	});
+}
+
+exports.describeContent = function(app){
+	var speechText = '',
+		responseText = config.site.actionStack.describeContent.responseText;
+	if(app.incomingRequest.result.parameters.contentName){
+		const rawContentName = app.incomingRequest.result.parameters.contentName;
+		const contentName = app.incomingRequest.result.parameters.contentName.replace("’", "").replace(/[\W_]+/g,"").trim().toLowerCase();
+		contentAction.searchContent(contentName)
+		.then(function(response){
+			var content = _.find(response, function(obj){ return obj.gist.title.replace("’", "").replace(/[\W_]+/g,"").trim().toLowerCase() === contentName; });
+			if(content){
+				speechText += content.gist.logLine;
+				config.defaultText.describeContent.hasContent = config.defaultText.describeContent.hasContent.replace('{contentName}', rawContentName);
+				speechText = responseText ? responseText + ' ' + speechText : config.defaultText.describeContent.hasContent + ' ' + speechText;
+			}else{
+				speechText = config.defaultText.describeContent.noContent;
+			}
+			platform.googleHome.sendSpeechResponse(app, speechText);
+		})
+		.catch(function(error){
+			if(error && error.speechText){
+				module.exports.sendError(app, error.speechText);
+			}else{
+				module.exports.sendError(app);
+			}
+		});
+	}else{
+		module.exports.sendError(app, "Sorry! I culd not undersatand what you are looking for.");
+	}
 }

@@ -1,4 +1,4 @@
-exports.sendSpeachResponse = function(app, speachText){
+exports.sendSpeechResponse = function(app, speachText){
 	var text_to_speech = '<speak>'+speachText+'</speak>';  
 	app.ask(text_to_speech);
 }
