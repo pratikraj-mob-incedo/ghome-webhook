@@ -10,7 +10,7 @@ exports.getPageContent = function(pageID){
 			'Authorization'	:config.authToken,
 			'x-api-key'		:config.xApiKey
 		}
-		var fetchContentAPI = config.site.apiBaseUrl + '/content/pages';
+		var fetchContentAPI = 'http://prod-api.viewlift.com' + '/content/pages';
 		var options = {
 			url: fetchContentAPI,
 			method: 'GET',
@@ -20,7 +20,7 @@ exports.getPageContent = function(pageID){
 				'userId': userAction.userInfo.id,
 				'includeContent': true,
 				'pageId': pageID,
-				'site':config.site.internalName
+				'site':config.site.internalName === 'hoichoi-tv' ? 'hoichoitv' : 'snagfilms'
 			}
 		}
 
@@ -36,24 +36,11 @@ exports.getPageContent = function(pageID){
 
 exports.searchContent = function(searchTerm){
 	return new Promise(function(resolve, reject){
-		var headers = {
-			'User-Agent'	:'Super Agent/0.0.1',
-			'Authorization'	:config.authToken,
-			'x-api-key'		:config.xApiKey
-		}
-		var searchContentAPI = config.site.apiBaseUrl + '/search/v1';
+		var searchContentAPI = 'http://release-api.viewlift.com/search/v1?site=' + config.site.internalName + '&searchTerm=' + searchTerm.toString();
 		var options = {
 			url: searchContentAPI,
-			method: 'GET',
-			headers: headers,
-			qs: {
-				'userId': userAction.userInfo.id,
-				'searchTerm': searchTerm.toString(),
-				'site':config.site.internalName
-			}
+			method: 'GET'
 		}
-
-		console.log(" Searching content for " + options);
 
 		request(options, function (error, response, body) {
 			if (!error && response.statusCode == 200) {
@@ -72,7 +59,7 @@ exports.getContentSingle = function(contentID){
 			'Authorization'	:config.authToken,
 			'x-api-key'		:config.xApiKey
 		}
-		var fetchContentAPI = config.site.apiBaseUrl + '/content/videos';
+		var fetchContentAPI = 'http://prod-api.viewlift.com/content/videos';
 		var options = {
 			url: fetchContentAPI,
 			method: 'GET',
@@ -80,7 +67,7 @@ exports.getContentSingle = function(contentID){
 			qs: {
 				'userId': userAction.userInfo.id,
 				'ids': contentID,
-				'site':config.site.internalName
+				'site':config.site.internalName === 'hoichoi-tv' ? 'hoichoitv' : 'snagfilms'
 			}
 		}
 

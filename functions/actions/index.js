@@ -48,13 +48,11 @@ exports.getNew = function(app){
 			responseText = config.site.actionStack.getNew.responseText,
 			categoryName = config.site.actionStack.getNew.categoryMap;
 
-		if(response.categoryMap[categoryName] !== undefined){
-			var filteredContent = _.find(response.modules, function(obj){
-				if(obj.contentType && obj.contentType.toLowerCase() === 'video' && obj.title.toLowerCase() === categoryName.toLowerCase()){
-					return obj.contentData;
-				}
-				return false;
-			});
+		var filteredContent = _.find(response.modules, function(obj){
+			if(!obj.title){ return false; }
+			return obj.title.toLowerCase() === categoryName.toLowerCase();
+		});
+		if(filteredContent){
 			contentList = filteredContent.contentData;
 		}
 		if(contentList.length > 0){
@@ -86,9 +84,10 @@ exports.getPopular = function(app){
 			categoryName = config.site.actionStack.getPopular.categoryMap;
 
 		var filteredContent = _.find(response.modules, function(obj){
-			return (obj.contentType && obj.contentType.toLowerCase() === 'video' && obj.title.toLowerCase() === categoryName.toLowerCase());
+			if(!obj.title){ return false; }
+			return obj.title.toLowerCase() === categoryName.toLowerCase();
 		});
-		if(filteredContent && filteredContent.contentData){
+		if(filteredContent){
 			contentList = filteredContent.contentData;
 		}
 		if(contentList.length > 0){
@@ -111,17 +110,56 @@ exports.getPopular = function(app){
 	});
 }
 
+exports.categorySearch = function(app){
+	if(app.incomingRequest.result.parameters.category){
+		const categoryName = app.incomingRequest.result.parameters.category.replace("’", "").trim().toLowerCase();
+		contentAction.getPageContent(config.site.categoriesPageId)
+		.then(function(response){
+			var contentList = [],
+				speechText = '',
+				responseText = config.site.actionStack.categorySearch.responseText.replace('{category}', categoryName);
+			
+			var filteredContent = _.find(response.modules, function(obj){
+				if(!obj.title){ return false; }
+				return obj.title.replace("’", "").trim().toLowerCase() === categoryName.toLowerCase();
+			});
+			if(filteredContent){
+				contentList = filteredContent.contentData;
+			}
+			if(contentList.length > 0){
+				for(var i = 0; i < contentList.length; i++){
+					speechText += contentList[i].gist.title;
+					speechText += (parseInt(i + 1) === parseInt(contentList.length)) ? '.' : ', ';
+				}
+				speechText = responseText ? responseText + ' ' + speechText : config.defaultText.categorySearch.hasContent + ' ' + speechText;
+			}else{
+				speechText = config.defaultText.categorySearch.noContent;
+			}
+			platform.googleHome.sendSpeechResponse(app, speechText);
+		})
+		.catch(function(error){
+			if(error && error.speechText){
+				module.exports.sendError(app, error.speechText);
+			}else{
+				module.exports.sendError(app);
+			}
+		});
+	}else{
+		module.exports.sendError(app, "Sorry! I culd not undersatand what you are looking for.");
+	}
+}
+
 exports.describeContent = function(app){
 	var speechText = '',
 		responseText = config.site.actionStack.describeContent.responseText;
 	if(app.incomingRequest.result.parameters.contentName){
 		const rawContentName = app.incomingRequest.result.parameters.contentName;
-		const contentName = app.incomingRequest.result.parameters.contentName.replace("’", "").replace(/[\W_]+/g,"").trim().toLowerCase();
+		const contentName = app.incomingRequest.result.parameters.contentName.replace("’", "").replace(/[\W_]+/g,"+").trim().toLowerCase();
 		contentAction.searchContent(contentName)
 		.then(function(response){
-			var content = _.find(response, function(obj){ return obj.gist.title.replace("’", "").replace(/[\W_]+/g,"").trim().toLowerCase() === contentName; });
+			var content = _.find(response, function(obj){ return obj.gist.title.replace("’", "").replace(/[\W_]+/g,"+").trim().toLowerCase() === contentName; });
 			if(content){
-				speechText += content.gist.logLine;
+				speechText += content.gist.description;
 				config.defaultText.describeContent.hasContent = config.defaultText.describeContent.hasContent.replace('{contentName}', rawContentName);
 				speechText = responseText ? responseText + ' ' + speechText : config.defaultText.describeContent.hasContent + ' ' + speechText;
 			}else{
@@ -130,6 +168,100 @@ exports.describeContent = function(app){
 			platform.googleHome.sendSpeechResponse(app, speechText);
 		})
 		.catch(function(error){
+			if(error && error.speechText){
+				module.exports.sendError(app, error.speechText);
+			}else{
+				module.exports.sendError(app);
+			}
+		});
+	}else{
+		module.exports.sendError(app, "Sorry! I culd not undersatand what you are looking for.");
+	}
+}
+
+exports.getWatchlist = function(app){
+	var speechText = '',
+		responseText = config.site.actionStack.getWatchlist.responseText;
+	
+	userAction.getAutheticationToken()
+	.then(function(response){
+		return userAction.getWatchlist(response.authorizationToken);
+	})
+	.then(function(response){
+		if(response.records.length > 0){
+			var contentList = response.records;
+			for(var i = 0; i < contentList.length; i++){
+				speechText += contentList[i].contentResponse.gist.title;
+				speechText += (parseInt(i + 1) === parseInt(contentList.length)) ? '.' : ', ';
+			}
+			speechText = responseText ? responseText.replace('{n}', parseInt(contentList.length)) + ' ' + speechText : config.defaultText.categorySearch.hasContent + ' ' + speechText;
+		}else{
+			speechText = config.defaultText.getWatchlist.noContent;
+		}
+		platform.googleHome.sendSpeechResponse(app, speechText);
+	})
+	.catch(function(err){
+		console.log(err);
+		module.exports.sendError(app, "Sorry! We could not fetch your watchlist right now.");
+	});
+}
+
+exports.getNextBillingDate = function(app){
+	var speechText = '';
+	
+	userAction.getUserIdentityToken()
+	.then(function(response){
+		console.log("authorizationToken = " + response.authorizationToken);
+		return userAction.getNextBillingDate(response.authorizationToken);
+	})
+	.then(function(response){
+		if(response.subscriptionInfo){
+			var nextBillingDate = moment(new Date(response.subscriptionInfo.subscriptionEndDate)).format("YYYY-MM-DD"),
+				subscriptionStatus = response.subscriptionInfo.subscriptionStatus;
+
+			speechText = config.defaultText.nextBillingDate[subscriptionStatus].replace('{date}', nextBillingDate);
+		}else{
+			speechText = "Sorry! We could not fetch your subscription details right now.";
+		}
+		platform.googleHome.sendSpeechResponse(app, speechText);
+	})
+	.catch(function(err){
+		console.log(err);
+		module.exports.sendError(app, "Sorry! We could not fetch your subscription details right now.");
+	});
+}
+
+exports.addToWatchlist = function(app){
+	var speechText = '',
+		responseText = config.site.actionStack.addToWatchlist.responseText,
+		contentId = null,
+		contentTitle = null,
+		contentType = null;
+	if(app.incomingRequest.result.parameters.contentName){
+		const rawContentName = app.incomingRequest.result.parameters.contentName;
+		const contentName = app.incomingRequest.result.parameters.contentName.replace("’", "").replace(/[\W_]+/g,"+").trim().toLowerCase();
+		contentAction.searchContent(contentName)
+		.then(function(response){
+			var content = _.find(response, function(obj){ return obj.gist.title.replace("’", "").replace(/[\W_]+/g,"+").trim().toLowerCase() === contentName; });
+			if(content){
+				contentId = content.gist.id;
+				contentType = content.gist.contentType;
+				contentTitle = content.gist.title;
+				return userAction.getUserIdentityToken();
+			}else{
+				throw new Error({'speechText': config.defaultText.addToWatchlist.failed.replace('{contentName}', rawContentName)});
+			}
+		})
+		.then(function(response){
+			return userAction.addToWatchlist(response.authorizationToken, contentId, contentType, 1);
+		})
+		.then(function(response){
+			speechText = responseText ? responseText.replace('{contentName}', contentTitle) : config.defaultText.addToWatchlist.success.replace('{contentName}', contentTitle);
+			platform.googleHome.sendSpeechResponse(app, speechText);
+		})
+		.catch(function(error){
+			console.log("An error occured");
+			console.log(error);
 			if(error && error.speechText){
 				module.exports.sendError(app, error.speechText);
 			}else{

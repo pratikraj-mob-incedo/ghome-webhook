@@ -23,9 +23,17 @@ exports.gHomeWebhook = functions.https.onRequest((request, response) => {
 	console.log("action is " + action);
 
 	actionMap.set("welcome", actions.welcome);
+
+	// Content Specific Action Map
 	actionMap.set("getNew", actions.getNew);
 	actionMap.set("getPopular", actions.getPopular);
+	actionMap.set("categorySearch", actions.categorySearch);
 	actionMap.set("describeContent", actions.describeContent);
+
+	// User Specific Action Map
+	actionMap.set("getWatchlist", actions.getWatchlist);
+	actionMap.set("addToWatchlist", actions.addToWatchlist);
+	actionMap.set("nextBillingDate", actions.getNextBillingDate);
 
 	var user = app.getUser();
 
@@ -41,6 +49,8 @@ exports.gHomeWebhook = functions.https.onRequest((request, response) => {
 		app.handleRequest(actionMap);
 	})
 	.catch(function(err){
+		console.log("An error occured");
+		console.log(err);
 		if(err.speechText){
 			actions.sendError(app, err.speechText);
 		}else{
